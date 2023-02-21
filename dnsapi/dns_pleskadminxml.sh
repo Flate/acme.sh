@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-##  Name: dns_pleskxml.sh
+##  Name: dns_pleskadminxml.sh
 ##  Created by Stilez.
 ##  Also uses some code from PR#1832 by @romanlum (https://github.com/acmesh-official/acme.sh/pull/1832/files)
 
@@ -27,7 +27,7 @@
 
 ##  Ok, let's issue a cert now:
 ##  ```
-##  acme.sh --issue --dns dns_pleskxml -d example.com -d www.example.com
+##  acme.sh --issue --dns dns_pleskadminxml -d example.com -d www.example.com
 ##  ```
 ##
 ##  The `pleskxml_uri`, `pleskxml_user` and `pleskxml_pass` will be saved in `~/.acme.sh/account.conf` and reused when needed.
@@ -60,12 +60,12 @@ pleskxml_tplt_rmv_dns_record="<packet><dns><del_rec><filter><id>%s</id></filter>
 
 ####################  Public functions ##################################
 
-#Usage: dns_pleskxml_add   _acme-challenge.www.domain.com   "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
-dns_pleskxml_add() {
+#Usage: dns_pleskadminxml_add   _acme-challenge.www.domain.com   "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
+dns_pleskadminxml_add() {
   fulldomain=$1
   txtvalue=$2
 
-  _info "Entering dns_pleskxml_add() to add TXT record '$txtvalue' to domain '$fulldomain'..."
+  _info "Entering dns_pleskadminxml_add() to add TXT record '$txtvalue' to domain '$fulldomain'..."
 
   # Get credentials if not already checked, and confirm we can log in to Plesk XML API
   if ! _credential_check; then
@@ -103,17 +103,17 @@ dns_pleskxml_add() {
 
   recid="$(_value "$results" | grep '<id>[0-9]\{1,\}</id>' | sed 's/^.*<id>\([0-9]\{1,\}\)<\/id>.*$/\1/')"
 
-  _info "Success. TXT record appears to be correctly added (Plesk record ID=$recid). Exiting dns_pleskxml_add()."
+  _info "Success. TXT record appears to be correctly added (Plesk record ID=$recid). Exiting dns_pleskadminxml_add()."
 
   return 0
 }
 
-#Usage: dns_pleskxml_rm   _acme-challenge.www.domain.com   "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
-dns_pleskxml_rm() {
+#Usage: dns_pleskadminxml_rm   _acme-challenge.www.domain.com   "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
+dns_pleskadminxml_rm() {
   fulldomain=$1
   txtvalue=$2
 
-  _info "Entering dns_pleskxml_rm() to remove TXT record '$txtvalue' from domain '$fulldomain'..."
+  _info "Entering dns_pleskadminxml_rm() to remove TXT record '$txtvalue' from domain '$fulldomain'..."
 
   # Get credentials if not already checked, and confirm we can log in to Plesk XML API
   if ! _credential_check; then
@@ -190,7 +190,7 @@ dns_pleskxml_rm() {
     return 1
   fi
 
-  _info "Success. TXT record appears to be correctly removed. Exiting dns_pleskxml_rm()."
+  _info "Success. TXT record appears to be correctly removed. Exiting dns_pleskadminxml_rm()."
   return 0
 }
 
@@ -321,7 +321,7 @@ _credential_check() {
     pleskxml_uri=""
     _err "You didn't specify one or more of the Plesk XML API username, password, or URI."
     _err "Please create these and try again."
-    _err "Instructions are in the 'dns_pleskxml' plugin source code or in the acme.sh documentation."
+    _err "Instructions are in the 'dns_pleskadminxml' plugin source code or in the acme.sh documentation."
     return 1
   fi
 
