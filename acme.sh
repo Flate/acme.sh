@@ -2229,6 +2229,20 @@ _send_signed_request() {
         _debug3 _body "$_body"
       fi
 
+      _retryafter=$(echo "$responseHeaders" | grep -i "^Retry-After *: *[0-9]\+ *" | cut -d : -f 2 | tr -d ' ' | tr -d '\r')
+      if [ "$code" = '503' ]; then
+        _sleep_overload_retry_sec=$_retryafter
+        if [ -z "$_sleep_overload_retry_sec" ]; then
+          _sleep_overload_retry_sec=5
+        fi
+        if [ $_sleep_overload_retry_sec -le 600 ]; then
+          _info "It seems the CA server is currently overloaded, let's wait and retry. Sleeping $_sleep_overload_retry_sec seconds."
+          _sleep $_sleep_overload_retry_sec
+          continue
+        else
+          _info "The retryafter=$_retryafter is too large > 600, not retry anymore."
+        fi
+      fi
       if _contains "$_body" "JWS has invalid anti-replay nonce" || _contains "$_body" "JWS has an invalid anti-replay nonce"; then
         _info "It seems the CA server is busy now, let's wait and retry. Sleeping $_sleep_retry_sec seconds."
         _CACHED_NONCE=""
@@ -2398,7 +2412,7 @@ _getdeployconf() {
     return 0 # do nothing
   fi
   _saved="$(_readdomainconf "SAVED_$_rac_key")"
-  eval $_rac_key="$_saved"
+  eval $_rac_key=\$_saved
   export $_rac_key
 }
 
@@ -2863,7 +2877,7 @@ _initpath() {
 
     if _isEccKey "$_ilength"; then
       DOMAIN_PATH="$domainhomeecc"
-    else
+    elif [ -z "$__SELECTED_RSA_KEY" ]; then
       if [ ! -d "$domainhome" ] && [ -d "$domainhomeecc" ]; then
         _info "The domain '$domain' seems to have a ECC cert already, lets use ecc cert."
         DOMAIN_PATH="$domainhomeecc"
@@ -5772,6 +5786,7 @@ deploy() {
     return 1
   fi
 
+  _debug2 DOMAIN_CONF "$DOMAIN_CONF"
   . "$DOMAIN_CONF"
 
   _savedomainconf Le_DeployHook "$_hooks"
@@ -6131,8 +6146,22 @@ revoke() {
 
   uri="${ACME_REVOKE_CERT}"
 
+  _info "Try account key first."
+  if _send_signed_request "$uri" "$data" "" "$ACCOUNT_KEY_PATH"; then
+    if [ -z "$response" ]; then
+      _info "Revoke success."
+      rm -f "$CERT_PATH"
+      cat "$CERT_KEY_PATH" >"$CERT_KEY_PATH.revoked"
+      cat "$CSR_PATH" >"$CSR_PATH.revoked"
+      return 0
+    else
+      _err "Revoke error."
+      _debug "$response"
+    fi
+  fi
+
   if [ -f "$CERT_KEY_PATH" ]; then
-    _info "Try domain key first."
+    _info "Try domain key."
     if _send_signed_request "$uri" "$data" "" "$CERT_KEY_PATH"; then
       if [ -z "$response" ]; then
         _info "Revoke success."
@@ -6147,21 +6176,6 @@ revoke() {
     fi
   else
     _info "Domain key file doesn't exist."
-  fi
-
-  _info "Try account key."
-
-  if _send_signed_request "$uri" "$data" "" "$ACCOUNT_KEY_PATH"; then
-    if [ -z "$response" ]; then
-      _info "Revoke success."
-      rm -f "$CERT_PATH"
-      cat "$CERT_KEY_PATH" >"$CERT_KEY_PATH.revoked"
-      cat "$CSR_PATH" >"$CSR_PATH.revoked"
-      return 0
-    else
-      _err "Revoke error."
-      _debug "$response"
-    fi
   fi
   return 1
 }
@@ -7508,6 +7522,9 @@ _process() {
     --keylength | -k)
       _keylength="$2"
       shift
+      if [ "$_keylength" ] && ! _isEccKey "$_keylength"; then
+        export __SELECTED_RSA_KEY=1
+      fi
       ;;
     -ak | --accountkeylength)
       _accountkeylength="$2"
